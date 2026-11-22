@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Video Shuffler</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <main class="main">
+      <header class="topbar">
+        <div class="brand">
+          <div class="logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          </div>
+          <div>
+            <h1>Video Shuffler</h1>
+            <p>Cắt đoạn 1–2s · xáo trộn · ghép thành clip ngắn</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn ghost" id="clearBtn" hidden>Xoá video đã xong</button>
+          <button class="btn" id="addBtn">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Thêm video
+          </button>
+        </div>
+      </header>
+
+      <div class="alert" id="ffmpegAlert" hidden></div>
+
+      <section class="dropzone" id="dropzone">
+        <div class="dz-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        </div>
+        <h2>Kéo thả video vào đây</h2>
+        <p>Có thể thả nhiều video hoặc cả thư mục. Video được xếp hàng và render lần lượt.</p>
+        <button class="btn primary" id="pickBtn">Chọn video từ máy</button>
+      </section>
+
+      <section class="queue" id="queue" hidden>
+        <div class="queue-head">
+          <span id="queueTitle">Hàng đợi</span>
+          <span class="muted" id="queueSummary"></span>
+        </div>
+        <div class="list" id="list"></div>
+        <button class="add-more" id="addMore">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Thả thêm video vào bất kỳ đâu trong cửa sổ, hoặc bấm để chọn
+        </button>
+      </section>
+    </main>
+
+    <aside class="side">
+      <div class="side-scroll">
+        <h3>Cài đặt</h3>
+
+        <div class="field">
+          <label>Thời lượng mỗi clip <span class="muted-label">mặc định</span></label>
+          <div class="chips" id="lengthChips">
+            <button data-v="10">10s</button>
+            <button data-v="15">15s</button>
+            <button data-v="20">20s</button>
+            <button data-v="30">30s</button>
+          </div>
+          <div class="input-unit">
+            <input type="number" id="clipSeconds" min="1" step="1">
+            <span>giây</span>
+          </div>
+          <p class="hint">Áp dụng cho mọi video. Bấm nhãn ⏱ trên từng video để đặt thời lượng và độ dài đoạn riêng. Số clip mặc định là tối đa mà không lặp cảnh; chọn nhiều hơn thì các clip cuối dùng lại cảnh nhưng vẫn khác nhau.</p>
+        </div>
+
+        <div class="field">
+          <label>Độ dài mỗi đoạn cắt <span class="muted-label">mặc định</span></label>
+          <div class="range-pair">
+            <div class="input-unit"><input type="number" id="segMin" min="0.2" step="0.1"><span>s</span></div>
+            <span class="dash">–</span>
+            <div class="input-unit"><input type="number" id="segMax" min="0.2" step="0.1"><span>s</span></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Chế độ render</label>
+          <div class="modes" id="modes">
+            <label class="mode">
+              <input type="radio" name="mode" value="gpu">
+              <div>
+                <strong>Chip Mac <em>Khuyên dùng</em></strong>
+                <span>Êm, nhanh, gần như không tốn CPU. Chất lượng đo được bằng hoặc cao hơn bản cũ.</span>
+              </div>
+            </label>
+            <label class="mode">
+              <input type="radio" name="mode" value="cpu_quiet">
+              <div>
+                <strong>CPU êm</strong>
+                <span>Encoder x265 như bản cũ, chỉ chạy trên lõi tiết kiệm điện. Chậm hơn nhiều.</span>
+              </div>
+            </label>
+            <label class="mode">
+              <input type="radio" name="mode" value="cpu_max">
+              <div>
+                <strong>CPU tối đa</strong>
+                <span>Encoder x265 như bản cũ, dùng toàn bộ lõi. Quạt sẽ kêu.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-head">
+            <label>Watermark</label>
+            <label class="switch" title="Bật watermark mặc định cho mọi clip">
+              <input type="checkbox" id="wmEnabled"><span></span>
+            </label>
+          </div>
+          <button class="wm-summary" id="wmEdit">
+            <img id="wmThumb" alt="">
+            <div>
+              <strong id="wmTitle">Đang tắt</strong>
+              <span id="wmDesc">Bấm để chỉnh chữ, logo, vị trí</span>
+            </div>
+            <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+          </button>
+          <p class="hint">Mặc định áp dụng cho mọi clip. Bấm nhãn “WM” trên từng video để đặt riêng cho video đó hoặc từng clip.</p>
+        </div>
+
+        <div class="field">
+          <label>Lưu vào</label>
+          <div class="folder">
+            <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span id="outputRoot" title=""></span>
+          </div>
+          <div class="row-btns">
+            <button class="btn small" id="changeDir">Đổi thư mục</button>
+            <button class="btn small ghost" id="openDir">Mở trong Finder</button>
+          </div>
+        </div>
+
+        <details class="field advanced">
+          <summary>Nâng cao</summary>
+          <label for="seed">Seed</label>
+          <input type="text" id="seed" inputmode="numeric" placeholder="Để trống = ngẫu nhiên">
+          <p class="hint">Nhập lại seed của lần render cũ (cùng video, cùng cài đặt) để ra đúng kết quả cũ.</p>
+        </details>
+      </div>
+
+      <footer class="side-foot">
+        <div class="overall" id="overall" hidden>
+          <div class="overall-text"><span id="overallLabel"></span><span id="overallPct"></span></div>
+          <div class="bar"><i id="overallBar"></i></div>
+        </div>
+        <p class="foot-summary" id="footSummary">Chưa có video</p>
+        <button class="btn primary big" id="startBtn" disabled>Bắt đầu render</button>
+      </footer>
+    </aside>
+  </div>
+
+  <div class="drag-overlay" id="dragOverlay">
+    <div>
+      <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <p>Thả để thêm vào hàng đợi</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Cửa sổ chỉnh watermark -->
+  <div class="modal" id="wmModal" hidden>
+    <div class="sheet editor">
+      <header class="sheet-head">
+        <h2 id="edTitle">Watermark</h2>
+        <button class="icon-btn" data-close title="Đóng"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </header>
+      <div class="editor-body">
+        <div class="preview-col">
+          <div class="preview-box"><img id="edPreview" alt=""></div>
+          <div class="wm-warn" id="edWarn" hidden>
+            <span id="edWarnText"></span>
+            <button class="link" id="edWarnFix">Bật viền chữ</button>
+          </div>
+          <select id="edBg" title="Xem trước trên"></select>
+          <p class="hint center">Ảnh xem trước dùng màu thường. Video HDR được chuyển màu tự động khi render.</p>
+        </div>
+        <div class="form-col">
+          <div class="tabs">
+            <button data-tab="text" class="on">Chữ</button>
+            <button data-tab="logo">Logo</button>
+          </div>
+
+          <section data-pane="text">
+            <div class="row-switch"><span>Hiện chữ</span><label class="switch"><input type="checkbox" data-k="text.enabled"><span></span></label></div>
+            <label class="lbl">Nội dung</label>
+            <textarea data-k="text.content" rows="2" placeholder="@tenkenh"></textarea>
+            <div class="grid2">
+              <div><label class="lbl">Font</label><select data-k="text.font" id="edFont"></select></div>
+              <div><label class="lbl">Màu chữ</label>
+                <div class="colors" id="edColors">
+                  <button data-c="#ffffff" style="background:#fff"></button>
+                  <button data-c="#000000" style="background:#000"></button>
+                  <button data-c="#ffd60a" style="background:#ffd60a"></button>
+                  <button data-c="#ff3b30" style="background:#ff3b30"></button>
+                  <label class="custom-color" title="Màu khác"><input type="color" data-k="text.color"></label>
+                </div>
+              </div>
+            </div>
+            <div class="toggles">
+              <label class="chk"><input type="checkbox" data-k="text.bold"> Chữ đậm</label>
+              <label class="chk"><input type="checkbox" data-k="text.outline"> Viền chữ</label>
+              <label class="chk"><input type="checkbox" data-k="text.shadow"> Bóng đổ</label>
+              <label class="chk"><input type="checkbox" data-k="text.box"> Nền mờ</label>
+            </div>
+            <label class="lbl">Cỡ chữ <output data-out="text.size"></output></label>
+            <input type="range" data-k="text.size" min="1.5" max="15" step="0.5">
+            <label class="lbl">Độ đậm nhạt <output data-out="text.opacity"></output></label>
+            <input type="range" data-k="text.opacity" min="10" max="100" step="5">
+            <label class="lbl">Vị trí</label>
+            <div class="pos-row">
+              <div class="pos-grid" data-pos="text.position"></div>
+              <div class="pos-margin">
+                <label class="lbl">Cách mép <output data-out="text.margin"></output></label>
+                <input type="range" data-k="text.margin" min="0" max="20" step="0.5">
+              </div>
+            </div>
+          </section>
+
+          <section data-pane="logo" hidden>
+            <div class="row-switch"><span>Hiện logo</span><label class="switch"><input type="checkbox" data-k="logo.enabled"><span></span></label></div>
+            <div class="logo-pick">
+              <div class="logo-img"><img id="edLogoImg" alt=""></div>
+              <div>
+                <button class="btn small" id="edPickLogo">Chọn ảnh logo…</button>
+                <p class="hint">Nên dùng PNG nền trong suốt. App lưu sẵn một bản, nên di chuyển hay xoá file gốc cũng không sao.</p>
+              </div>
+            </div>
+            <label class="lbl">Kích thước <output data-out="logo.size"></output></label>
+            <input type="range" data-k="logo.size" min="4" max="60" step="1">
+            <label class="lbl">Độ đậm nhạt <output data-out="logo.opacity"></output></label>
+            <input type="range" data-k="logo.opacity" min="10" max="100" step="5">
+            <label class="lbl">Vị trí</label>
+            <div class="pos-row">
+              <div class="pos-grid" data-pos="logo.position"></div>
+              <div class="pos-margin">
+                <label class="lbl">Cách mép <output data-out="logo.margin"></output></label>
+                <input type="range" data-k="logo.margin" min="0" max="20" step="0.5">
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <footer class="sheet-foot">
+        <button class="btn ghost" data-close>Huỷ</button>
+        <button class="btn primary" id="edSave">Lưu</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Watermark riêng cho 1 video / từng clip -->
+  <div class="modal" id="jobWmModal" hidden>
+    <div class="sheet narrow">
+      <header class="sheet-head">
+        <h2 id="jwTitle">Watermark</h2>
+        <button class="icon-btn" data-close title="Đóng"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </header>
+      <div class="sheet-body">
+        <label class="lbl">Cả video</label>
+        <div class="seg" id="jwVideoMode">
+          <button data-m="default">Theo mặc định</button>
+          <button data-m="off">Không watermark</button>
+          <button data-m="custom">Riêng cho video</button>
+        </div>
+        <button class="btn small" id="jwEditVideo" hidden>Chỉnh watermark riêng của video…</button>
+        <p class="hint" id="jwVideoHint"></p>
+
+        <div class="clip-head">
+          <label class="lbl">Từng clip</label>
+          <span class="hint" id="jwClipHint"></span>
+        </div>
+        <div class="clip-list" id="jwClips"></div>
+      </div>
+      <footer class="sheet-foot">
+        <button class="btn ghost" data-close>Huỷ</button>
+        <button class="btn primary" id="jwSave">Lưu</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Thời lượng riêng cho 1 video -->
+  <div class="modal" id="timingModal" hidden>
+    <div class="sheet narrow">
+      <header class="sheet-head">
+        <h2 id="tmTitle">Thời lượng</h2>
+        <button class="icon-btn" data-close title="Đóng"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </header>
+      <div class="sheet-body">
+        <div class="seg" id="tmMode">
+          <button data-m="default">Theo mặc định</button>
+          <button data-m="custom">Riêng cho video này</button>
+        </div>
+        <p class="hint" id="tmDefaultHint"></p>
+        <div id="tmCustom">
+          <label class="lbl">Thời lượng mỗi clip</label>
+          <div class="chips" id="tmChips">
+            <button data-v="10">10s</button>
+            <button data-v="15">15s</button>
+            <button data-v="20">20s</button>
+            <button data-v="30">30s</button>
+          </div>
+          <div class="input-unit"><input type="number" id="tmClip" min="1" step="1"><span>giây</span></div>
+          <label class="lbl">Độ dài mỗi đoạn cắt</label>
+          <div class="range-pair">
+            <div class="input-unit"><input type="number" id="tmMin" min="0.2" step="0.1"><span>s</span></div>
+            <span class="dash">–</span>
+            <div class="input-unit"><input type="number" id="tmMax" min="0.2" step="0.1"><span>s</span></div>
+          </div>
+        </div>
+        <div class="tm-result" id="tmResult"></div>
+      </div>
+      <footer class="sheet-foot">
+        <button class="btn ghost" data-close>Huỷ</button>
+        <button class="btn primary" id="tmSave">Lưu</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="wm.js"></script>
+  <script src="timing.js"></script>
+</body>
+</html>

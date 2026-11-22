@@ -1,0 +1,15 @@
+<!doctype html>
+<!-- Dùng Chrome headless chụp thành icon 1024x1024 (xem packaging/build_app.sh) -->
+<html><head><style>
+  html, body { margin: 0; width: 1024px; height: 1024px; background: transparent; }
+  .icon { position: absolute; left: 100px; top: 100px; width: 824px; height: 824px; border-radius: 185px;
+    background: linear-gradient(135deg, #7c6cff 0%, #b06cff 100%);
+    box-shadow: inset 0 4px 0 rgba(255,255,255,.25), 0 20px 50px rgba(60,40,160,.35);
+    display: grid; place-items: center; overflow: hidden; }
+  .icon::after { content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,.28), transparent 55%); }
+  svg { width: 470px; height: 470px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; position: relative; z-index: 1; }
+</style></head>
+<body><div class="icon">
+  <svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+</div></body></html>
